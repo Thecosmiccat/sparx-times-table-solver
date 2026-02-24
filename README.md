@@ -66,7 +66,7 @@ python3 sparxtimestablesolver.py
 3. Click `Capture Bottom-Right`.
 4. Move mouse to the bottom-right of the question box before countdown ends.
 5. Confirm red border matches question area.
-6. Enter `Rounds` (example: `25`).
+6. Enter `Rounds` (best `25`)
 7. Click `Start`.
 8. Quickly switch to your sparx window
 

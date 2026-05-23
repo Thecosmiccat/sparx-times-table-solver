@@ -2,15 +2,13 @@
  * Sparx Learning / Hundred Club DOM helpers (shadow DOM + split operand spans).
  */
 const SparxDom = (() => {
-  const MATH_LINE =
-    /(\d+\s*[×x*÷/+\-−]\s*\d+|\d+\s*[×x*]\s*\d+|\d+\s+\d+|\d{2,4})/;
   const OP_CHAR = /^[×x*÷/+\-−]$/;
   const DIGIT_ONLY = /^\d{1,3}$/;
   const NOISE =
-    /hundred|club|sparx|task|round|score|timer|level|package|submit|enter|next|previous|cookie|menu|settings/i;
+    /hundred|club|sparx|task|round|score|timer|level|package|submit|enter|next|previous|cookie|menu|settings|package|student|games/i;
 
   function isOurUi(el) {
-    return !!el?.closest?.("#sparx-solver-root");
+    return !!el?.closest?.("#sparx-solver-root, #sparx-solver-tab");
   }
 
   function isVisible(el) {
@@ -20,7 +18,7 @@ const SparxDom = (() => {
     if (r.bottom < 0 || r.top > window.innerHeight) return false;
     if (r.right < 0 || r.left > window.innerWidth) return false;
     const s = window.getComputedStyle(el);
-    if (s.display === "none" || s.visibility === "hidden" || s.opacity === "0") return false;
+    if (s.display === "none" || s.visibility === "hidden" || Number(s.opacity) === 0) return false;
     return true;
   }
 
@@ -42,28 +40,44 @@ const SparxDom = (() => {
     }
   }
 
+  /** Normalise to solver-friendly expression (always use * not letter x). */
   function cleanLine(text) {
-    return text
+    return String(text || "")
       .replace(/=\s*\?.*$/i, "")
       .replace(/\?/g, "")
-      .replace(/[−]/g, "-")
-      .replace(/×/g, "x")
+      .replace(/[−–—]/g, "-")
+      .replace(/×/g, "*")
+      .replace(/÷/g, "/")
+      .replace(/(\d)\s*x\s*(\d)/gi, "$1*$2")
       .trim();
+  }
+
+  function isSolvable(text) {
+    if (!text || NOISE.test(text)) return false;
+    if (typeof SparxSolver === "undefined") return true;
+    const { answer, normalized } = SparxSolver.solve(text);
+    return !!(answer && normalized);
   }
 
   function scoreCandidate(text, source) {
     if (!text || text.length < 2 || text.length > 40) return -1;
     if (NOISE.test(text)) return -1;
     if (!/\d/.test(text)) return -1;
+    if (!isSolvable(text)) return -1;
+
     let score = 0;
-    if (MATH_LINE.test(text)) score += 30;
-    if (/[×x*÷/+\-]/.test(text)) score += 20;
-    if (source === "tokens") score += 25;
-    if (source === "large") score += 15;
-    if (source === "near-input") score += 20;
-    if (source === "aria") score += 18;
-    if (/^\d+\s*[x*]\s*\d+$/i.test(text.replace(/\s/g, ""))) score += 15;
+    if (/[*/+\-]/.test(text)) score += 25;
+    if (/^\d{1,2}\s*[*/+\-]\s*\d{1,2}$/.test(text.replace(/\s/g, ""))) score += 30;
+    if (source === "tokens") score += 35;
+    if (source === "large") score += 20;
+    if (source === "near-input") score += 22;
+    if (source === "aria") score += 15;
+    if (source === "body") score += 5;
     return score;
+  }
+
+  function fontSize(el) {
+    return parseFloat(window.getComputedStyle(el).fontSize) || 12;
   }
 
   function findAnswerInput() {
@@ -73,8 +87,6 @@ const SparxDom = (() => {
       'input[inputmode="numeric"]:not([disabled])',
       'input[type="tel"]:not([disabled])',
       'input[class*="answer" i]:not([disabled])',
-      'input[class*="Answer" i]:not([disabled])',
-      'input[data-testid*="answer" i]:not([disabled])',
       "textarea:not([disabled])",
       '[contenteditable="true"]',
       '[role="textbox"]',
@@ -110,7 +122,10 @@ const SparxDom = (() => {
     return roots;
   }
 
-  /** Hundred Club: "12" and "12" in separate large spans, × may be CSS-only */
+  /**
+   * Hundred Club shows a grid of 1–12 plus the question as two LARGE numbers.
+   * Pick the pair of largest numbers on the same row, above the answer area.
+   */
   function findFromOperandTokens(input) {
     const inputRect = input?.getBoundingClientRect();
     const items = [];
@@ -121,70 +136,66 @@ const SparxDom = (() => {
       if (!direct) continue;
 
       const r = el.getBoundingClientRect();
+      const cx = r.left + r.width / 2;
+      const cy = r.top + r.height / 2;
+      const fs = fontSize(el);
+
       if (DIGIT_ONLY.test(direct)) {
-        items.push({ kind: "n", text: direct, x: r.left + r.width / 2, y: r.top + r.height / 2, fs: fontSize(el) });
+        items.push({ kind: "n", text: direct, x: cx, y: cy, fs });
       } else if (OP_CHAR.test(direct)) {
         const op = direct.replace(/×/g, "*").replace(/÷/g, "/").replace(/−/g, "-");
-        items.push({ kind: "o", text: op, x: r.left + r.width / 2, y: r.top + r.height / 2, fs: fontSize(el) });
+        items.push({ kind: "o", text: op, x: cx, y: cy, fs });
       }
     }
 
-    if (items.length < 2) return "";
+    const nums = items.filter((i) => i.kind === "n");
+    if (nums.length < 2) return "";
 
-    const rows = clusterByY(items, 40);
-    let best = "";
+    const maxFs = Math.max(...nums.map((n) => n.fs));
+    const bigNums = nums.filter((n) => n.fs >= maxFs * 0.88);
+    if (bigNums.length < 2) return "";
+
+    const ops = items.filter((i) => i.kind === "o");
+    let bestExpr = "";
     let bestScore = -1;
 
-    for (const row of rows) {
-      row.sort((a, b) => a.x - b.x);
-      const nums = row.filter((i) => i.kind === "n");
-      const ops = row.filter((i) => i.kind === "o");
-      let expr = "";
+    for (let i = 0; i < bigNums.length; i++) {
+      for (let j = i + 1; j < bigNums.length; j++) {
+        const a = bigNums[i];
+        const b = bigNums[j];
+        const dy = Math.abs(a.y - b.y);
+        if (dy > 40) continue;
 
-      if (nums.length >= 2) {
-        if (ops.length) {
-          expr = row.map((i) => i.text).join("");
-        } else {
-          expr = `${nums[0].text}*${nums[1].text}`;
+        const dx = Math.abs(a.x - b.x);
+        if (dx < 20 || dx > 600) continue;
+
+        const left = a.x < b.x ? a : b;
+        const right = a.x < b.x ? b : a;
+
+        const betweenOp = ops.find(
+          (o) => o.x > left.x && o.x < right.x && Math.abs(o.y - left.y) < 45
+        );
+
+        const expr = betweenOp
+          ? `${left.text}${betweenOp.text}${right.text}`
+          : `${left.text}*${right.text}`;
+
+        if (!isSolvable(expr)) continue;
+
+        let s = left.fs + right.fs + 50;
+        const midY = (left.y + right.y) / 2;
+        if (inputRect && midY < inputRect.top) s += 25;
+        if (inputRect) s += Math.max(0, 40 - Math.abs(midY - inputRect.top) / 15);
+        s += Math.max(0, 30 - Math.abs(midY - window.innerHeight * 0.35) / 10);
+
+        if (s > bestScore) {
+          bestScore = s;
+          bestExpr = expr;
         }
-      } else if (nums.length === 1 && row.length >= 2) {
-        continue;
-      } else {
-        continue;
-      }
-
-      let s = scoreCandidate(expr, "tokens") + Math.min(...nums.map((n) => n.fs));
-      if (inputRect) {
-        const rowY = nums[0].y;
-        if (rowY < inputRect.top) s += 15;
-        const dy = Math.abs(rowY - inputRect.top);
-        s += Math.max(0, 30 - dy / 10);
-      }
-      if (s > bestScore) {
-        bestScore = s;
-        best = expr;
       }
     }
 
-    return cleanLine(best);
-  }
-
-  function fontSize(el) {
-    return parseFloat(window.getComputedStyle(el).fontSize) || 12;
-  }
-
-  function clusterByY(items, threshold) {
-    const rows = [];
-    const sorted = [...items].sort((a, b) => a.y - b.y);
-    for (const item of sorted) {
-      let row = rows.find((r) => Math.abs(r[0].y - item.y) <= threshold);
-      if (!row) {
-        row = [];
-        rows.push(row);
-      }
-      row.push(item);
-    }
-    return rows;
+    return cleanLine(bestExpr);
   }
 
   function findFromLargeText() {
@@ -194,10 +205,12 @@ const SparxDom = (() => {
     for (const el of walkRoots(document.body)) {
       if (!isVisible(el)) continue;
       const fs = fontSize(el);
-      if (fs < 22) continue;
+      if (fs < 26) continue;
+
       const t = cleanLine((el.innerText || el.textContent || "").trim());
-      if (t.length > 50) continue;
-      const lines = t.split("\n").map((l) => l.trim()).filter(Boolean);
+      if (!t || t.length > 30) continue;
+
+      const lines = t.split("\n").map((l) => cleanLine(l)).filter(Boolean);
       for (const line of lines) {
         const s = scoreCandidate(line, "large") + fs;
         if (s > bestScore) {
@@ -215,9 +228,11 @@ const SparxDom = (() => {
     let best = "";
     let bestScore = -1;
 
-    for (let d = 0; node && d < 14; d++) {
-      const t = (node.innerText || "").trim();
-      const lines = t.split("\n").map((l) => cleanLine(l)).filter(Boolean);
+    for (let d = 0; node && d < 12; d++) {
+      const lines = (node.innerText || "")
+        .split("\n")
+        .map((l) => cleanLine(l))
+        .filter(Boolean);
       for (const line of lines) {
         const s = scoreCandidate(line, "near-input");
         if (s > bestScore) {
@@ -230,52 +245,14 @@ const SparxDom = (() => {
     return best;
   }
 
-  function findFromAria() {
-    let best = "";
-    let bestScore = -1;
-
-    for (const el of walkRoots(document.body)) {
-      if (!isVisible(el)) continue;
-      const label = el.getAttribute?.("aria-label") || "";
-      const labelled = el.getAttribute?.("aria-labelledby");
-      let extra = label;
-      if (labelled) {
-        const ref = document.getElementById(labelled);
-        if (ref) extra += " " + (ref.textContent || "");
-      }
-      const t = cleanLine(extra);
-      const s = scoreCandidate(t, "aria");
-      if (s > bestScore) {
-        bestScore = s;
-        best = t;
-      }
-    }
-    return best;
-  }
-
   function findFromBodyScan() {
     const matches =
-      document.body?.innerText?.match(/\d+\s*[×x*÷/+\-−]\s*\d+|\d+\s+\d+/g) || [];
+      document.body?.innerText?.match(/\d{1,2}\s*[×x*÷/+\-−]\s*\d{1,2}/g) || [];
     let best = "";
     let bestScore = -1;
     for (const m of matches) {
       const t = cleanLine(m);
       const s = scoreCandidate(t, "body");
-      if (s > bestScore) {
-        bestScore = s;
-        best = t;
-      }
-    }
-    return best;
-  }
-
-  function findFromSvgText() {
-    let best = "";
-    let bestScore = -1;
-    for (const el of document.querySelectorAll("svg text, svg tspan")) {
-      if (!isVisible(el)) continue;
-      const t = cleanLine(el.textContent || "");
-      const s = scoreCandidate(t, "svg");
       if (s > bestScore) {
         bestScore = s;
         best = t;
@@ -290,8 +267,6 @@ const SparxDom = (() => {
       findFromOperandTokens(input),
       findNearInput(input),
       findFromLargeText(),
-      findFromAria(),
-      findFromSvgText(),
       findFromBodyScan(),
     ].filter(Boolean);
 
@@ -307,9 +282,24 @@ const SparxDom = (() => {
     return best;
   }
 
+  /** For UI: raw text even if unsolvable (debug). */
+  function findQuestionTextDebug() {
+    const input = findAnswerInput();
+    const parts = [
+      findFromOperandTokens(input),
+      findNearInput(input),
+      findFromLargeText(),
+      findFromBodyScan(),
+    ].filter(Boolean);
+    return parts[0] || "";
+  }
+
   return {
     findQuestionText,
+    findQuestionTextDebug,
     findAnswerInput,
+    isSolvable,
+    cleanLine,
     isVisible,
     isOurUi,
   };

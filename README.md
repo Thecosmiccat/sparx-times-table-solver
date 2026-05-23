@@ -51,7 +51,7 @@ The extension lives in the **`extension/`** folder — not the repo root.
 
 1. Open **Sparx Maths** (100 Club or similar) in Chrome and **refresh the page** after installing the extension.
 
-2. A **Sparx Solver** panel appears at the **bottom-right** of the page — use this (not only the toolbar popup).
+2. A small **Sparx Solver** bar appears at the **top-left** (collapsed). Click **+** to expand, or **×** to hide it if it covers the question. A **Sparx Solver** tab at the bottom-left brings it back.
 
 3. Open a question with the **answer box** visible.
 

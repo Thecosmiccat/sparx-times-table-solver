@@ -51,7 +51,7 @@ The extension lives in the **`extension/`** folder — not the repo root.
 
 1. Open **Sparx Maths** (100 Club or similar) in Chrome and **refresh the page** after installing the extension.
 
-2. A small **Sparx Solver** bar appears at the **top-left** (collapsed). Click **+** to expand, or **×** to hide it if it covers the question. A **Sparx Solver** tab at the bottom-left brings it back.
+2. A **Sparx Solver** tab at the **bottom-left** opens the controls (hidden by default so it does not cover the question). Hundred Club shows **`12 × 7 = ?`** at the top — the extension reads that box and types the answer with your keyboard (Enter to submit).
 
 3. Open a question with the **answer box** visible.
 

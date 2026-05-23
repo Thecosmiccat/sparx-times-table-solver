@@ -2,7 +2,7 @@
  * Sparx page automation + floating control panel (stays on page when popup closes).
  */
 (() => {
-  const findAnswerInput = () => SparxDom.findAnswerInput();
+  const findAnswerTarget = () => SparxDom.findAnswerFocusTarget();
   const findQuestionText = () => SparxDom.findQuestionText();
 
   let running = false;
@@ -23,51 +23,50 @@
   }
 
   function canHandlePage() {
-    return !!(findAnswerInput() || findQuestionText());
+    return !!(findQuestionText() || findAnswerTarget());
   }
 
-  function setInputValue(input, value) {
-    input.focus();
-    if (input.isContentEditable) {
-      input.textContent = value;
-      input.dispatchEvent(new InputEvent("input", { bubbles: true, data: value }));
-      return;
+  /** Hundred Club listens for physical keyboard — no <input> field. */
+  function dispatchKey(key, code, type) {
+    const opts = {
+      key,
+      code,
+      keyCode: key.length === 1 ? key.charCodeAt(0) : 13,
+      which: key.length === 1 ? key.charCodeAt(0) : 13,
+      bubbles: true,
+      cancelable: true,
+    };
+    for (const target of [document, document.body, window]) {
+      target.dispatchEvent(new KeyboardEvent(type, opts));
     }
-    const proto = Object.getPrototypeOf(input);
-    const desc = Object.getOwnPropertyDescriptor(proto, "value");
-    if (desc?.set) desc.set.call(input, value);
-    else input.value = value;
-    input.dispatchEvent(new InputEvent("input", { bubbles: true, data: value }));
-    input.dispatchEvent(new Event("change", { bubbles: true }));
   }
 
-  function submitAnswer(input) {
-    input.dispatchEvent(
-      new KeyboardEvent("keydown", {
-        key: "Enter",
-        code: "Enter",
-        keyCode: 13,
-        which: 13,
-        bubbles: true,
-      })
-    );
-    input.dispatchEvent(
-      new KeyboardEvent("keyup", {
-        key: "Enter",
-        code: "Enter",
-        keyCode: 13,
-        which: 13,
-        bubbles: true,
-      })
-    );
+  async function typeAnswer(value) {
+    const target = findAnswerTarget();
+    target?.focus?.();
+    window.focus();
+    await sleep(80);
 
-    const form = input.closest("form");
-    form?.requestSubmit?.();
+    const str = String(value);
+    for (const ch of str) {
+      const code = ch >= "0" && ch <= "9" ? `Digit${ch}` : `Key${ch}`;
+      dispatchKey(ch, code, "keydown");
+      dispatchKey(ch, code, "keypress");
+      dispatchKey(ch, code, "keyup");
+      await sleep(50);
+    }
+  }
 
-    for (const btn of document.querySelectorAll("button, [role='button']")) {
-      const label = (btn.innerText || btn.getAttribute("aria-label") || "").toLowerCase();
-      if (/submit|check|enter|next|continue|done/.test(label) && !btn.disabled) {
-        btn.click();
+  function submitAnswer() {
+    dispatchKey("Enter", "Enter", "keydown");
+    dispatchKey("Enter", "Enter", "keyup");
+
+    // Green OK button on the on-screen keypad
+    for (const el of document.querySelectorAll("button, [role='button'], div, span")) {
+      if (!SparxDom.isVisible(el) || SparxDom.isOurUi(el)) continue;
+      const label = (el.innerText || el.textContent || "").trim().toLowerCase();
+      if (label === "ok") {
+        el.click();
         return;
       }
     }
@@ -146,25 +145,10 @@
       }
       dupes = 0;
 
-      const input = findAnswerInput();
-      if (!input) {
-        sendStatus({
-          running: true,
-          completed,
-          total: rounds,
-          raw,
-          normalized,
-          answer,
-          message: "Click the answer box, then Start again.",
-        });
-        await sleep(repeatDelay);
-        continue;
-      }
-
       lastQuestion = normalized;
-      setInputValue(input, answer);
-      await sleep(120);
-      submitAnswer(input);
+      await typeAnswer(answer);
+      await sleep(150);
+      submitAnswer();
 
       completed += 1;
       sendStatus({
@@ -259,6 +243,9 @@
     tab.type = "button";
     tab.textContent = "Sparx Solver";
     tab.title = "Show Sparx Solver panel";
+
+    root.classList.add("sparx-hidden");
+    tab.classList.add("sparx-show");
 
     document.documentElement.appendChild(root);
     document.documentElement.appendChild(tab);
@@ -363,7 +350,9 @@
       }
     });
 
-    updatePanel({ message: "Hundred Club ready — click + then Scan." });
+    updatePanel({
+      message: "Hidden by default (won't block question). Click Sparx Solver tab (bottom-left).",
+    });
 
     let scanTimer;
     const observer = new MutationObserver(() => {

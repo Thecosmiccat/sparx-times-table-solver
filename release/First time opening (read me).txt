@@ -1,9 +1,38 @@
-If macOS says the app is "damaged" or won't open:
+SPARX SOLVER PRO — FIRST TIME ON macOS
+======================================
 
-1. Unzip Sparx Solver Pro.zip
-2. Double-click "Open Sparx Solver Pro.command" (in this folder)
-   — or right-click Sparx Solver Pro.app → Open → Open
+The app is NOT damaged. macOS blocks downloads that are not from the App Store.
 
-3. In System Settings, allow Screen Recording and Accessibility for Sparx Solver Pro.
+FASTEST FIX
+-----------
+Double-click:  Open Sparx Solver Pro.command
 
-You do NOT need to install Python.
+That clears the block and opens the app.
+
+
+OTHER OPTIONS
+-------------
+• Right-click Sparx Solver Pro.app → Open → Open
+
+• Terminal (copy one block):
+
+  xattr -cr ~/Downloads/Sparx\ Solver\ Pro.app
+  xattr -dr com.apple.quarantine ~/Downloads/Sparx\ Solver\ Pro.app 2>/dev/null
+  open ~/Downloads/Sparx\ Solver\ Pro.app
+
+  (Use /Applications/... if you moved the app there.)
+
+
+PERMISSIONS (REQUIRED)
+----------------------
+System Settings → Privacy & Security:
+
+  • Screen Recording  → ON for Sparx Solver Pro
+  • Accessibility     → ON for Sparx Solver Pro
+
+Then quit and reopen the app.
+
+
+HELP
+----
+Full guide: https://github.com/Thecosmiccat/sparx-times-table-solver

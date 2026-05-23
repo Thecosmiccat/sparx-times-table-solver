@@ -53,23 +53,19 @@ pyinstaller --noconfirm --clean sparx_pro.spec
 
 OUT="$DIST/$APP_NAME"
 
-# Copy to a clean path so Finder/iCloud xattrs don't break codesign ("damaged" on open)
 if [[ -d "$OUT" ]]; then
-  CLEAN="/tmp/sparx-pro-sign.app"
-  rm -rf "$CLEAN"
-  ditto "$OUT" "$CLEAN"
-  xattr -cr "$CLEAN"
-  codesign --force --deep --sign - "$CLEAN"
-  rm -rf "$OUT"
-  ditto "$CLEAN" "$OUT"
-  rm -rf "$CLEAN"
+  chmod +x "$ROOT/scripts/sign_app.sh"
+  "$ROOT/scripts/sign_app.sh" "$OUT"
 fi
 if [[ -d "$OUT" ]]; then
   cp "$ROOT/release/Open Sparx Solver Pro.command" "$DIST/"
   cp "$ROOT/release/First time opening (read me).txt" "$DIST/"
   chmod +x "$DIST/Open Sparx Solver Pro.command"
-  (cd "$DIST" && rm -f "Sparx Solver Pro.zip" && zip -r -y "Sparx Solver Pro.zip" \
+  xattr -cr "$DIST"
+  rm -f "$DIST/Sparx Solver Pro.zip"
+  (cd "$DIST" && zip -r -y -q "Sparx Solver Pro.zip" \
     "Sparx Solver Pro.app" "Open Sparx Solver Pro.command" "First time opening (read me).txt")
+  xattr -cr "$DIST/Sparx Solver Pro.zip"
   echo ""
   echo "Built: $OUT"
   echo "Zip:   $DIST/Sparx Solver Pro.zip"

@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+.venv/
+venv/
+.build-venv/
+*.egg-info/
+.eggs/
+dist/
+build/
+*.spec.bak
+
+# OCR models (downloaded by scripts/build_mac_app.sh)
+resources/models/**/*.pth
+resources/models/**/*.pkl
+!resources/models/.gitkeep
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# IDE / env
+.env
+.env.*
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# PyInstaller / local artifacts
+*.log

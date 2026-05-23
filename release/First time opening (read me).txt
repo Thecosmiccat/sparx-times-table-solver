@@ -1,0 +1,9 @@
+If macOS says the app is "damaged" or won't open:
+
+1. Unzip Sparx Solver Pro.zip
+2. Double-click "Open Sparx Solver Pro.command" (in this folder)
+   — or right-click Sparx Solver Pro.app → Open → Open
+
+3. In System Settings, allow Screen Recording and Accessibility for Sparx Solver Pro.
+
+You do NOT need to install Python.

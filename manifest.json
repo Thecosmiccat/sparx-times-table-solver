@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "Sparx Times Table Solver",
+  "version": "2.0.0",
+  "description": "Reads Sparx Maths questions from the page, solves them, and fills in the answer.",
+  "permissions": ["storage", "activeTab"],
+  "host_permissions": [
+    "https://*.sparxmaths.com/*",
+    "https://*.sparx-learning.com/*",
+    "https://maths.sparx.com/*",
+    "https://*.sparxmaths.uk/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Sparx Solver"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.sparxmaths.com/*",
+        "https://*.sparx-learning.com/*",
+        "https://maths.sparx.com/*",
+        "https://*.sparxmaths.uk/*"
+      ],
+      "js": ["solver.js", "content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

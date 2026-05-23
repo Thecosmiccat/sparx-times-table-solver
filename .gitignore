@@ -1,35 +1,18 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-.Python
-.venv/
-venv/
-.build-venv/
-*.egg-info/
-.eggs/
-dist/
-build/
-*.spec.bak
-
-# OCR models (downloaded by scripts/build_mac_app.sh)
-resources/models/**/*.pth
-resources/models/**/*.pkl
-!resources/models/.gitkeep
-
-# macOS
 .DS_Store
 .AppleDouble
-.LSOverride
 ._*
-
-# IDE / env
-.env
-.env.*
 .idea/
 .vscode/
 *.swp
-*.swo
+.env
+.env.*
 
-# PyInstaller / local artifacts
-*.log
+# Old desktop build artifacts (if any remain locally)
+.build-venv/
+dist/
+build/
+__pycache__/
+*.pyc
+
+# Packaged extension zip
+*.zip

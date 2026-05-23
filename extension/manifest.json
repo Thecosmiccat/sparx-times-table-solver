@@ -8,8 +8,7 @@
     "https://*.sparxmaths.com/*",
     "https://*.sparx-learning.com/*",
     "https://maths.sparx.com/*",
-    "https://*.sparxmaths.uk/*",
-    "https://*.sparx-learning.com/*"
+    "https://*.sparxmaths.uk/*"
   ],
   "action": {
     "default_popup": "popup.html",
@@ -27,7 +26,7 @@
         "https://*.sparxmaths.uk/*",
         "https://*.sparx-learning.com/*"
       ],
-      "js": ["solver.js", "content.js"],
+      "js": ["solver.js", "sparx-dom.js", "content.js"],
       "css": ["panel.css"],
       "run_at": "document_idle",
       "all_frames": true

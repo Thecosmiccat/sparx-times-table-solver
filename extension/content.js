@@ -2,7 +2,8 @@
  * Sparx page automation + floating control panel (stays on page when popup closes).
  */
 (() => {
-  const MATH_PATTERN = /(\d+\s*[×x*÷/+\-]\s*\d+|\d+\s+\d+|\d{2,4})/;
+  const findAnswerInput = () => SparxDom.findAnswerInput();
+  const findQuestionText = () => SparxDom.findQuestionText();
 
   let running = false;
   let stopRequested = false;
@@ -21,87 +22,6 @@
 
   function canHandlePage() {
     return !!(findAnswerInput() || findQuestionText());
-  }
-
-  function findAnswerInput() {
-    const candidates = [
-      ...document.querySelectorAll('input[type="text"]:not([disabled])'),
-      ...document.querySelectorAll('input[type="number"]:not([disabled])'),
-      ...document.querySelectorAll('input[inputmode="numeric"]:not([disabled])'),
-      ...document.querySelectorAll('input[type="tel"]:not([disabled])'),
-      ...document.querySelectorAll("textarea:not([disabled])"),
-      ...document.querySelectorAll('[contenteditable="true"]'),
-    ];
-
-    const visible = candidates.filter((el) => {
-      const r = el.getBoundingClientRect();
-      return r.width > 16 && r.height > 8 && r.bottom > 0 && r.top < window.innerHeight;
-    });
-
-    if (!visible.length) return null;
-
-    const focused = document.activeElement;
-    if (focused && visible.includes(focused)) return focused;
-
-    return visible[visible.length - 1];
-  }
-
-  function findQuestionText() {
-    const input = findAnswerInput();
-    const texts = [];
-
-    const selectors = [
-      "[class*='question']",
-      "[class*='Question']",
-      "[class*='task']",
-      "[class*='Task']",
-      "[class*='prompt']",
-      "[class*='equation']",
-      "[data-testid*='question']",
-      "h1",
-      "h2",
-      "h3",
-      "p",
-      "span",
-      "label",
-    ];
-
-    for (const sel of selectors) {
-      for (const el of document.querySelectorAll(sel)) {
-        if (input && (el === input || el.contains(input))) continue;
-        const t = (el.innerText || el.textContent || "").trim();
-        if (t.length > 1 && t.length < 120 && MATH_PATTERN.test(t)) {
-          texts.push(t.split("\n")[0].trim());
-        }
-      }
-    }
-
-    if (input) {
-      let node = input.parentElement;
-      for (let depth = 0; node && depth < 10; depth++) {
-        const lines = (node.innerText || "")
-          .split("\n")
-          .map((l) => l.trim())
-          .filter((l) => MATH_PATTERN.test(l));
-        texts.push(...lines);
-        node = node.parentElement;
-      }
-    }
-
-    const bodyMatch = document.body?.innerText?.match(
-      /\d+\s*[×x*÷/]\s*\d+|\d+\s+\d+/g
-    );
-    if (bodyMatch) texts.push(...bodyMatch);
-
-    const unique = [...new Set(texts)];
-    unique.sort((a, b) => b.length - a.length);
-
-    for (const t of unique) {
-      const cleaned = t.replace(/=\s*\?.*$/, "").replace(/\?/g, "").trim();
-      if (cleaned.length >= 2) return cleaned;
-    }
-
-    return "";
   }
 
   function setInputValue(input, value) {
@@ -267,7 +187,9 @@
       raw,
       normalized,
       answer,
-      message: raw ? "Scanned" : "No question found on this part of the page",
+      message: raw
+        ? "Scanned"
+        : "No question found — try Hide panel (×) if it blocks the numbers",
     });
     return { raw, normalized, answer };
   }
@@ -291,10 +213,11 @@
     const root = document.createElement("div");
     root.id = "sparx-solver-root";
     root.innerHTML = `
-      <div id="sparx-solver-panel">
+      <div id="sparx-solver-panel" class="sparx-collapsed">
         <div class="sparx-head">
           <strong>Sparx Solver</strong>
-          <button type="button" class="sparx-minimize" title="Minimize">−</button>
+          <button type="button" class="sparx-minimize" title="Expand / collapse">+</button>
+          <button type="button" class="sparx-hide" title="Hide (won't block question)">×</button>
         </div>
         <div class="sparx-body">
           <label>Rounds</label>
@@ -302,20 +225,28 @@
           <label>Delay (ms)</label>
           <input type="number" class="sparx-delay" min="200" max="5000" step="50" value="800" />
           <div class="sparx-btns">
-            <button type="button" class="sparx-start">Start</button>
-            <button type="button" class="sparx-stop" disabled>Stop</button>
+            <button type="button" class="sparx-start sparx-action">Start</button>
+            <button type="button" class="sparx-stop sparx-action" disabled>Stop</button>
           </div>
-          <button type="button" class="sparx-scan">Scan question</button>
+          <button type="button" class="sparx-scan sparx-action">Scan question</button>
           <div class="sparx-info">
             <div>Detected: <em class="sparx-detected">—</em></div>
             <div>Answer: <em class="sparx-answer">—</em></div>
             <div>Progress: <em class="sparx-progress">0 / 0</em></div>
           </div>
-          <div class="sparx-status">Use this panel — the toolbar popup closes when you click away.</div>
+          <div class="sparx-status">Collapsed bar — click + to expand. Use × if it covers the question.</div>
         </div>
       </div>
     `;
+
+    const tab = document.createElement("button");
+    tab.id = "sparx-solver-tab";
+    tab.type = "button";
+    tab.textContent = "Sparx Solver";
+    tab.title = "Show Sparx Solver panel";
+
     document.documentElement.appendChild(root);
+    document.documentElement.appendChild(tab);
 
     const panel = root.querySelector("#sparx-solver-panel");
     const head = panel.querySelector(".sparx-head");
@@ -344,7 +275,22 @@
       chrome.storage.local.set({ delay: panelUi.delayInput.value });
     });
 
-    minBtn.addEventListener("click", () => panel.classList.toggle("sparx-collapsed"));
+    const hideBtn = panel.querySelector(".sparx-hide");
+
+    minBtn.addEventListener("click", () => {
+      const collapsed = panel.classList.toggle("sparx-collapsed");
+      minBtn.textContent = collapsed ? "+" : "−";
+    });
+
+    hideBtn.addEventListener("click", () => {
+      root.classList.add("sparx-hidden");
+      tab.classList.add("sparx-show");
+    });
+
+    tab.addEventListener("click", () => {
+      root.classList.remove("sparx-hidden");
+      tab.classList.remove("sparx-show");
+    });
 
     let drag = false;
     let ox = 0;
@@ -402,7 +348,31 @@
       }
     });
 
-    updatePanel({ message: "Ready — open a question, then Scan or Start." });
+    updatePanel({ message: "Hundred Club ready — click + then Scan." });
+
+    let scanTimer;
+    const observer = new MutationObserver(() => {
+      if (running || root.classList.contains("sparx-hidden")) return;
+      clearTimeout(scanTimer);
+      scanTimer = setTimeout(() => {
+        const raw = findQuestionText();
+        if (raw && panelUi) {
+          const { answer, normalized } = SparxSolver.solve(raw);
+          updatePanel({
+            raw,
+            normalized,
+            answer,
+            running: false,
+            completed: 0,
+            total: parseInt(panelUi.roundsInput.value, 10) || 25,
+            message: "Question detected",
+          });
+        }
+      }, 500);
+    });
+    if (document.body) {
+      observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+    }
   }
 
   chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {

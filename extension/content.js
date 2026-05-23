@@ -8,6 +8,8 @@
   let running = false;
   let stopRequested = false;
   let lastQuestion = "";
+  let lastFailRaw = "";
+  let failStreak = 0;
 
   function sleep(ms) {
     return new Promise((r) => setTimeout(r, ms));
@@ -100,18 +102,28 @@
       }
 
       if (!answer) {
+        const debug = SparxDom.findQuestionTextDebug?.() || raw;
+        failStreak = debug === lastFailRaw ? failStreak + 1 : 0;
+        lastFailRaw = debug;
+
         sendStatus({
           running: true,
           completed,
           total: rounds,
-          raw,
-          normalized,
+          raw: debug,
+          normalized: normalized || SparxSolver.normalize(debug),
           answer: null,
-          message: `Can't solve: ${raw}`,
+          message:
+            failStreak >= 8
+              ? `Stuck — hide panel (×), check both numbers are visible, then Scan`
+              : `Can't solve "${debug}"${normalized ? ` → ${normalized}` : ""}`,
         });
-        await sleep(repeatDelay);
+        await sleep(failStreak >= 8 ? roundDelay : repeatDelay);
         continue;
       }
+
+      failStreak = 0;
+      lastFailRaw = "";
 
       sendStatus({
         running: true,
@@ -179,19 +191,22 @@
 
   function doScan() {
     const raw = findQuestionText();
-    const { answer, normalized } = SparxSolver.solve(raw);
+    const debug = SparxDom.findQuestionTextDebug?.() || raw;
+    const { answer, normalized } = SparxSolver.solve(raw || debug);
     sendStatus({
       running,
       completed: 0,
       total: parseInt(panelUi?.roundsInput?.value, 10) || 25,
-      raw,
+      raw: raw || debug,
       normalized,
       answer,
-      message: raw
-        ? "Scanned"
-        : "No question found — try Hide panel (×) if it blocks the numbers",
+      message: answer
+        ? `OK: ${normalized} = ${answer}`
+        : raw
+          ? `Found "${debug}" but can't solve — are both numbers on screen?`
+          : "No question — hide panel (×) if it blocks the numbers",
     });
-    return { raw, normalized, answer };
+    return { raw: raw || debug, normalized, answer };
   }
 
   // ── Floating panel (top frame only) ─────────────────────────────────────
@@ -356,18 +371,18 @@
       clearTimeout(scanTimer);
       scanTimer = setTimeout(() => {
         const raw = findQuestionText();
-        if (raw && panelUi) {
-          const { answer, normalized } = SparxSolver.solve(raw);
-          updatePanel({
-            raw,
-            normalized,
-            answer,
-            running: false,
-            completed: 0,
-            total: parseInt(panelUi.roundsInput.value, 10) || 25,
-            message: "Question detected",
-          });
-        }
+        if (!raw || !panelUi) return;
+        const { answer, normalized } = SparxSolver.solve(raw);
+        if (!answer) return;
+        updatePanel({
+          raw,
+          normalized,
+          answer,
+          running: false,
+          completed: 0,
+          total: parseInt(panelUi.roundsInput.value, 10) || 25,
+          message: `Detected: ${normalized} = ${answer}`,
+        });
       }, 500);
     });
     if (document.body) {

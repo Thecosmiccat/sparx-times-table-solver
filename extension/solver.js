@@ -95,11 +95,17 @@ function normalize(raw) {
     text = text.replace(/(\d+)\s+(\d+)/g, "$1*$2");
   }
 
-  text = text.replace(/[^0-9+\-*/().=x]/gi, "");
+  text = text.replace(/(\d)\s*x\s*(\d)/gi, "$1*$2");
+  text = text.replace(/[^0-9+\-*/().=]/g, "");
   text = text.replace(/\s*([+\-*/=()])\s*/g, "$1");
 
   if (!hasOperator(text)) {
     text = repairGluedDigits(text);
+  }
+
+  // Lone small integer with no operator is usually UI noise (task id, score), not a question
+  if (/^\d{1,3}$/.test(text) && !hasOperator(text)) {
+    return "";
   }
 
   const opens = (text.match(/\(/g) || []).length;

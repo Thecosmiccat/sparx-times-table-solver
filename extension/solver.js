@@ -96,6 +96,7 @@ function normalize(raw) {
   }
 
   text = text.replace(/(\d)\s*x\s*(\d)/gi, "$1*$2");
+  text = text.replace(/=.*$/, ""); // "12×7=?" → "12×7"
   text = text.replace(/[^0-9+\-*/().=]/g, "");
   text = text.replace(/\s*([+\-*/=()])\s*/g, "$1");
 

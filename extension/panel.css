@@ -1,8 +1,8 @@
 #sparx-solver-root {
   position: fixed;
-  top: 12px;
+  bottom: 12px;
   left: 12px;
-  bottom: auto;
+  top: auto;
   right: auto;
   z-index: 2147483646;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;

@@ -68,6 +68,7 @@ const SparxDom = (() => {
     let score = 0;
     if (/[*/+\-]/.test(text)) score += 25;
     if (/^\d{1,2}\s*[*/+\-]\s*\d{1,2}$/.test(text.replace(/\s/g, ""))) score += 30;
+    if (source === "banner") score += 60;
     if (source === "tokens") score += 35;
     if (source === "large") score += 20;
     if (source === "near-input") score += 22;
@@ -78,6 +79,56 @@ const SparxDom = (() => {
 
   function fontSize(el) {
     return parseFloat(window.getComputedStyle(el).fontSize) || 12;
+  }
+
+  const QUESTION_RE =
+    /(\d{1,2}\s*[×x*÷/+\-−]\s*\d{1,2})\s*(?:=\s*\??)?/;
+
+  /** Hundred Club: "12 × 7 = ?" in the top question box. */
+  function findFromQuestionBanner() {
+    let best = "";
+    let bestScore = -1;
+
+    for (const el of walkRoots(document.body)) {
+      if (!isVisible(el)) continue;
+      const raw = (el.innerText || el.textContent || "").trim();
+      if (!raw || raw.length > 50) continue;
+
+      const m = raw.match(QUESTION_RE);
+      if (!m) continue;
+
+      const expr = cleanLine(m[1]);
+      if (!isSolvable(expr)) continue;
+
+      const fs = fontSize(el);
+      const r = el.getBoundingClientRect();
+      let s = scoreCandidate(expr, "banner") + fs;
+      if (r.top < window.innerHeight * 0.5) s += 50;
+      if (raw.length <= 20) s += 20;
+
+      if (s > bestScore) {
+        bestScore = s;
+        best = expr;
+      }
+    }
+    return best;
+  }
+
+  /** Sparx uses "..." answer box + keyboard — not always a real <input>. */
+  function findAnswerFocusTarget() {
+    const input = findAnswerInput();
+    if (input) return input;
+
+    for (const el of walkRoots(document.body)) {
+      if (!isVisible(el)) continue;
+      const t = (el.innerText || el.textContent || "").trim();
+      if (t === "..." || /^\.{2,}$/.test(t)) return el;
+    }
+
+    const game =
+      document.querySelector("[class*='Hundred' i], [class*='hundred' i], [class*='game' i], main") ||
+      document.body;
+    return game;
   }
 
   function findAnswerInput() {
@@ -262,11 +313,12 @@ const SparxDom = (() => {
   }
 
   function findQuestionText() {
-    const input = findAnswerInput();
+    const input = findAnswerFocusTarget();
     const candidates = [
+      findFromQuestionBanner(),
+      findFromLargeText(),
       findFromOperandTokens(input),
       findNearInput(input),
-      findFromLargeText(),
       findFromBodyScan(),
     ].filter(Boolean);
 
@@ -284,11 +336,12 @@ const SparxDom = (() => {
 
   /** For UI: raw text even if unsolvable (debug). */
   function findQuestionTextDebug() {
-    const input = findAnswerInput();
+    const banner = findFromQuestionBanner();
+    if (banner) return banner;
+    const input = findAnswerFocusTarget();
     const parts = [
-      findFromOperandTokens(input),
-      findNearInput(input),
       findFromLargeText(),
+      findFromOperandTokens(input),
       findFromBodyScan(),
     ].filter(Boolean);
     return parts[0] || "";
@@ -298,6 +351,7 @@ const SparxDom = (() => {
     findQuestionText,
     findQuestionTextDebug,
     findAnswerInput,
+    findAnswerFocusTarget,
     isSolvable,
     cleanLine,
     isVisible,

@@ -49,15 +49,19 @@ The extension lives in the **`extension/`** folder — not the repo root.
 
 ## How to use
 
-1. Open **Sparx Maths** (100 Club or similar) in Chrome.
+1. Open **Sparx Maths** (100 Club or similar) in Chrome and **refresh the page** after installing the extension.
 
-2. Open a question with the **answer box** visible.
+2. A **Sparx Solver** panel appears at the **bottom-right** of the page — use this (not only the toolbar popup).
 
-3. Click the extension icon → **Scan page now** → check **Detected** / **Answer**.
+3. Open a question with the **answer box** visible.
 
-4. Click in the Sparx **answer field**, then **Start**.
+4. Click **Scan question** on the panel → check **Detected** / **Answer**.
 
-5. **Stop** ends the session.
+5. Click in the Sparx **answer field**, then **Start** on the panel.
+
+6. **Stop** ends the session.
+
+> The toolbar popup **closes when you click outside it** — that is normal in Chrome. The on-page panel keeps running.
 
 ---
 

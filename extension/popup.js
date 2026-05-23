@@ -24,40 +24,39 @@ function updateUI(data) {
   setRunning(!!data.running);
 }
 
-async function activeTab() {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  return tab;
-}
-
-async function sendToTab(message) {
-  const tab = await activeTab();
-  if (!tab?.id) throw new Error("No active tab");
-  return chrome.tabs.sendMessage(tab.id, message);
+function sendCommand(action, options = {}) {
+  return new Promise((resolve, reject) => {
+    chrome.runtime.sendMessage({ type: "command", action, options }, (res) => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+      if (res?.ok === false) reject(new Error(res.error || "Failed"));
+      else resolve(res);
+    });
+  });
 }
 
 startBtn.addEventListener("click", async () => {
+  statusEl.textContent = "Starting…";
   try {
-    const rounds = parseInt(roundsEl.value, 10) || 25;
-    const roundDelay = parseInt(delayEl.value, 10) || 800;
-    await sendToTab({
-      action: "start",
-      rounds,
-      roundDelay,
+    await sendCommand("start", {
+      rounds: parseInt(roundsEl.value, 10) || 25,
+      roundDelay: parseInt(delayEl.value, 10) || 800,
       repeatDelay: 250,
     });
     setRunning(true);
-    statusEl.textContent = "Running…";
+    statusEl.textContent = "Running — use the panel on the Sparx page (popup can close).";
   } catch (e) {
-    statusEl.textContent =
-      "Open a Sparx Maths tab first (sparxmaths.com), then try again.";
+    statusEl.textContent = e.message || "Failed — refresh Sparx and use the on-page panel.";
   }
 });
 
 stopBtn.addEventListener("click", async () => {
   try {
-    await sendToTab({ action: "stop" });
+    await sendCommand("stop", {});
     setRunning(false);
-    statusEl.textContent = "Stopping…";
+    statusEl.textContent = "Stopped.";
   } catch {
     setRunning(false);
   }
@@ -65,18 +64,18 @@ stopBtn.addEventListener("click", async () => {
 
 scanBtn.addEventListener("click", async () => {
   try {
-    const res = await sendToTab({ action: "scan" });
+    const res = await sendCommand("scan", {});
     updateUI({
       raw: res.raw,
       normalized: res.normalized,
       answer: res.answer,
-      message: res.raw ? "Scanned page" : "No question found",
+      message: res.raw ? "Scanned" : "No question found",
       running: res.running,
       completed: 0,
       total: parseInt(roundsEl.value, 10) || 25,
     });
-  } catch {
-    statusEl.textContent = "Not on a Sparx page — open Sparx Maths first.";
+  } catch (e) {
+    statusEl.textContent = e.message || "Scan failed — use the panel on the Sparx page.";
   }
 });
 
@@ -89,21 +88,16 @@ chrome.storage.local.get(["rounds", "delay"], (data) => {
   if (data.delay) delayEl.value = data.delay;
 });
 
-roundsEl.addEventListener("change", () => {
-  chrome.storage.local.set({ rounds: roundsEl.value });
-});
-delayEl.addEventListener("change", () => {
-  chrome.storage.local.set({ delay: delayEl.value });
-});
+roundsEl.addEventListener("change", () => chrome.storage.local.set({ rounds: roundsEl.value }));
+delayEl.addEventListener("change", () => chrome.storage.local.set({ delay: delayEl.value }));
 
 (async () => {
+  statusEl.textContent = "Tip: use the Sparx Solver panel on the page (bottom-right).";
   try {
-    const res = await sendToTab({ action: "ping" });
+    const res = await sendCommand("ping", {});
     setRunning(!!res.running);
-    chrome.runtime.sendMessage({ type: "getStatus" }, (status) => {
-      if (status) updateUI(status);
-    });
+    chrome.runtime.sendMessage({ type: "getStatus" }, (s) => s && updateUI(s));
   } catch {
-    statusEl.textContent = "Open Sparx Maths in this tab, then open the extension.";
+    statusEl.textContent = "Open Sparx, refresh, then use the panel on the page.";
   }
 })();

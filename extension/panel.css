@@ -1,0 +1,135 @@
+#sparx-solver-root {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  z-index: 2147483646;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 13px;
+  color: #e8e8f0;
+  pointer-events: none;
+}
+
+#sparx-solver-root * {
+  box-sizing: border-box;
+  pointer-events: auto;
+}
+
+#sparx-solver-panel {
+  width: 280px;
+  background: #12121f;
+  border: 1px solid #2d2d44;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+
+#sparx-solver-panel .sparx-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: #1a1a2e;
+  cursor: move;
+  user-select: none;
+}
+
+#sparx-solver-panel .sparx-head strong {
+  font-size: 14px;
+}
+
+#sparx-solver-panel .sparx-minimize {
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+#sparx-solver-panel.sparx-collapsed .sparx-body {
+  display: none;
+}
+
+#sparx-solver-panel .sparx-body {
+  padding: 12px;
+}
+
+#sparx-solver-panel label {
+  display: block;
+  font-size: 11px;
+  color: #888;
+  margin-bottom: 4px;
+}
+
+#sparx-solver-panel input[type="number"] {
+  width: 100%;
+  padding: 8px;
+  margin-bottom: 10px;
+  border-radius: 8px;
+  border: 1px solid #2a2a40;
+  background: #0f0f1a;
+  color: #fff;
+}
+
+#sparx-solver-panel .sparx-btns {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+#sparx-solver-panel button {
+  flex: 1;
+  padding: 9px;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+#sparx-solver-panel .sparx-start {
+  background: #2d8a4e;
+  color: #fff;
+}
+
+#sparx-solver-panel .sparx-stop {
+  background: #8b2424;
+  color: #fff;
+}
+
+#sparx-solver-panel .sparx-scan {
+  width: 100%;
+  margin-bottom: 10px;
+  background: #252540;
+  color: #ccc;
+}
+
+#sparx-solver-panel .sparx-info {
+  font-size: 11px;
+  line-height: 1.45;
+  color: #aaa;
+}
+
+#sparx-solver-panel .sparx-info div {
+  margin-bottom: 4px;
+}
+
+#sparx-solver-panel .sparx-info em {
+  color: #60a5fa;
+  font-style: normal;
+  font-family: ui-monospace, monospace;
+}
+
+#sparx-solver-panel .sparx-status {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #2a2a40;
+  color: #7dd3a0;
+  font-size: 11px;
+}
+
+#sparx-solver-panel button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

@@ -1,114 +1,98 @@
 # Sparx Times Table Solver (Chrome Extension)
 
-A Chrome extension that reads maths questions **directly from the Sparx Maths page** (no screen capture or OCR), solves them, and fills in the answer.
-
-Works on [Sparx Maths](https://www.sparxmaths.com/) in the browser — no Mac app, Python, or permissions for screen recording.
+A Chrome extension that reads maths questions **directly from the Sparx Maths page**, solves them, and fills in the answer.
 
 ---
 
-## Install (developer / unpacked)
+## Folder layout
 
-1. **Download or clone** this repo:
+```
+sparx-times-table-solver/
+├── README.md          ← you are here
+└── extension/         ← load THIS folder in Chrome
+    ├── manifest.json
+    ├── content.js
+    ├── solver.js
+    ├── background.js
+    ├── popup.html
+    ├── popup.js
+    └── popup.css
+```
+
+The extension lives in the **`extension/`** folder — not the repo root.
+
+---
+
+## Install
+
+1. **Clone the repo:**
    ```bash
    git clone https://github.com/Thecosmiccat/sparx-times-table-solver.git
    cd sparx-times-table-solver
    ```
 
-2. Open Chrome and go to **`chrome://extensions`**.
+2. Open Chrome → **`chrome://extensions`**
 
-3. Turn on **Developer mode** (top right).
+3. Enable **Developer mode** (top right)
 
-4. Click **Load unpacked**.
+4. Click **Load unpacked**
 
-5. Select the project folder (the folder that contains `manifest.json`).
+5. Select the **`extension`** folder inside the repo:
+   ```
+   sparx-times-table-solver/extension
+   ```
+   (It must contain `manifest.json`.)
 
-6. Pin the extension: puzzle icon → **Sparx Times Table Solver**.
+6. Pin **Sparx Times Table Solver** from the puzzle icon in the toolbar.
 
 ---
 
 ## How to use
 
-1. Log in to **Sparx Maths** and open **100 Club** (or any times-table activity) in Chrome.
+1. Open **Sparx Maths** (100 Club or similar) in Chrome.
 
-2. Open a question so you see the **question text** and **answer box**.
+2. Open a question with the **answer box** visible.
 
-3. Click the extension icon in the toolbar.
+3. Click the extension icon → **Scan page now** → check **Detected** / **Answer**.
 
-4. Set **Rounds** (25 is typical).
+4. Click in the Sparx **answer field**, then **Start**.
 
-5. Click **Scan page now** — check **Detected** and **Answer** look correct.
-
-6. Click inside the Sparx **answer field** (cursor blinking).
-
-7. Click **Start**.
-
-8. Click **Stop** anytime to end the session.
-
-The extension reads text from the page, normalises expressions like `12 × 12` or glued `1212` → `12*12`, and submits the result.
-
----
-
-## What it solves
-
-- Addition, subtraction, multiplication, division  
-- Implicit multiply: `3x4`, `12×12`, `5 12`  
-- Glued OCR-style digits: `1212` → `12×12`, `512` → `5×12`  
-- Simple equations with `=` (when both sides are numeric)
+5. **Stop** ends the session.
 
 ---
 
 ## Troubleshooting
 
+### Loaded the wrong folder
+
+If Chrome says the manifest is missing, you picked the repo root. Choose **`extension/`** instead.
+
 ### “Open Sparx Maths in this tab first”
 
-- The active tab must be Sparx (`sparxmaths.com`, `sparx-learning.com`, etc.).
-- Refresh the Sparx page after installing the extension.
+- Use a Sparx tab (`sparxmaths.com`, etc.) and refresh after installing.
 
-### Detected shows “—”
+### Detected is “—”
 
-- Make sure the **question is visible** on screen.
-- Click **Scan page now** again.
-- Sparx may have updated their layout — open an issue with a screenshot.
+- Question must be on screen → try **Scan page now** again.
 
-### Answer is wrong
+### Nothing types
 
-- Use **Scan page now** and confirm **Detected** matches the question.
-- If Sparx shows unusual formatting, report it.
-
-### Nothing is typed
-
-- **Click the answer box** before **Start**.
-- Sparx must be the focused tab.
-- Try **Scan page now** first to confirm the extension is connected.
-
-### Extension not listed after load
-
-- Select the folder that contains **`manifest.json`**, not a parent folder.
+- Click the answer box before **Start**.
 
 ---
 
-## Project files
+## Project files (inside `extension/`)
 
 | File | Purpose |
 |------|---------|
-| `manifest.json` | Extension config (Manifest V3) |
-| `content.js` | Finds question + answer field on Sparx pages |
-| `solver.js` | Normalises and solves expressions |
-| `popup.html` / `popup.js` | Toolbar popup controls |
-| `background.js` | Status relay between tab and popup |
-
----
-
-## Publish to Chrome Web Store (optional)
-
-1. Zip the extension (only the files above, not `.git`):
-   ```bash
-   zip -r sparx-solver.zip manifest.json content.js solver.js background.js popup.html popup.js popup.css
-   ```
-2. Follow [Chrome Web Store developer docs](https://developer.chrome.com/docs/webstore/publish/).
+| `manifest.json` | Extension config |
+| `content.js` | Reads question, fills answer on Sparx pages |
+| `solver.js` | Maths normalisation + solver |
+| `popup.html` / `popup.js` | Toolbar UI |
+| `background.js` | Status messages |
 
 ---
 
 ## Legal
 
-For personal/educational use. Automating school platforms may violate their terms of service — use at your own risk.
+Personal/educational use only. May violate Sparx terms — use at your own risk.

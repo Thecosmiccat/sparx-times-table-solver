@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Sparx Times Table Solver",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Reads Sparx Maths questions from the page, solves them, and fills in the answer.",
   "permissions": ["storage", "activeTab", "scripting", "tabs"],
   "host_permissions": [
@@ -23,8 +23,7 @@
         "https://*.sparxmaths.com/*",
         "https://*.sparx-learning.com/*",
         "https://maths.sparx.com/*",
-        "https://*.sparxmaths.uk/*",
-        "https://*.sparx-learning.com/*"
+        "https://*.sparxmaths.uk/*"
       ],
       "js": ["solver.js", "sparx-dom.js", "content.js"],
       "css": ["panel.css"],

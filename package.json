@@ -1,0 +1,12 @@
+{
+  "name": "sparx-times-table-solver",
+  "private": true,
+  "version": "2.2.0",
+  "description": "Chrome extension that reads and solves Sparx Maths times-table questions",
+  "scripts": {
+    "test": "node tests/solver.test.js && node tests/sparx-dom.test.js"
+  },
+  "devDependencies": {
+    "jsdom": "^24.1.3"
+  }
+}

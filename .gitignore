@@ -3,6 +3,7 @@
 ._*
 .idea/
 .vscode/
+.cursor/
 *.swp
 .env
 .env.*
@@ -16,3 +17,6 @@ __pycache__/
 
 # Packaged extension zip
 *.zip
+
+# Node (solver / DOM unit tests)
+node_modules/

@@ -18,7 +18,7 @@ function setRunning(running) {
 function updateUI(data) {
   if (!data) return;
   detectedEl.textContent = data.normalized || data.raw || "—";
-  answerEl.textContent = data.answer || "—";
+  answerEl.textContent = data.answer ?? "—";
   progressEl.textContent = `${data.completed ?? 0} / ${data.total ?? 0}`;
   statusEl.textContent = data.message || "—";
   setRunning(!!data.running);
@@ -92,7 +92,7 @@ roundsEl.addEventListener("change", () => chrome.storage.local.set({ rounds: rou
 delayEl.addEventListener("change", () => chrome.storage.local.set({ delay: delayEl.value }));
 
 (async () => {
-  statusEl.textContent = "Tip: use the Sparx Solver panel on the page (bottom-right).";
+  statusEl.textContent = "Tip: use the Sparx Solver panel on the page (bottom-left).";
   try {
     const res = await sendCommand("ping", {});
     setRunning(!!res.running);

@@ -1,11 +1,20 @@
 /**
  * Math normalisation + solver (ported from desktop app, no OCR needed in-browser).
  */
-const OCR_MAP = {
+
+/** Unambiguous symbol swaps — safe on any string. */
+const SYMBOL_MAP = {
   "×": "*",
   "÷": "/",
+  "−": "-",
+  "–": "-",
+  "—": "-",
   ":": "/",
-  "?": "x",
+};
+
+/** Ambiguous OCR letter swaps — only when the string already looks numeric. */
+const OCR_LETTER_MAP = {
+  "?": "",
   X: "x",
   O: "0",
   I: "1",
@@ -14,6 +23,13 @@ const OCR_MAP = {
 
 function hasOperator(text) {
   return /[+\-*/=]/.test(text);
+}
+
+function looksMostlyNumeric(text) {
+  const cleaned = String(text || "").replace(/\s/g, "");
+  if (!cleaned) return false;
+  const mathish = cleaned.replace(/[^0-9+\-*/().=×÷xX?]/g, "");
+  return mathish.length / cleaned.length >= 0.6 && /\d/.test(mathish);
 }
 
 function scoreSplit(left, right, op) {
@@ -28,6 +44,8 @@ function scoreSplit(left, right, op) {
   if (right.length === 1 && left.length > 2) score -= 6;
   const li = parseInt(left, 10);
   const ri = parseInt(right, 10);
+  // Times-table style operands
+  if (li >= 1 && li <= 12 && ri >= 1 && ri <= 12) score += 8;
   if (li > 15 || ri > 15) score -= 8;
   return score;
 }
@@ -50,15 +68,13 @@ function safeEval(expr) {
   return Function(`"use strict"; return (${expr});`)();
 }
 
+/**
+ * Recover "912" → "9*12" style OCR misses.
+ * Never split 1–2 digit strings — those are usually UI noise (scores, ids).
+ */
 function repairGluedDigits(text) {
   if (!/^\d+$/.test(text)) return text;
-
-  if (text.length === 2) {
-    const expr = `${text[0]}*${text[1]}`;
-    return canEval(expr) ? expr : text;
-  }
-
-  if (text.length < 3) return text;
+  if (text.length < 3 || text.length > 6) return text;
 
   let bestExpr = null;
   let bestScore = -1;
@@ -67,45 +83,71 @@ function repairGluedDigits(text) {
     const left = text.slice(0, i);
     const right = text.slice(i);
     if (left.length > 4 || right.length > 4) continue;
+    // Avoid leading zeros in multi-digit operands
+    if ((left.length > 1 && left.startsWith("0")) || (right.length > 1 && right.startsWith("0"))) {
+      continue;
+    }
 
-    for (const op of ["*", "+", "-"]) {
-      if (op === "-" && parseInt(left, 10) < parseInt(right, 10)) continue;
-      const expr = `${left}${op}${right}`;
-      if (!canEval(expr)) continue;
-      const s = scoreSplit(left, right, op);
-      if (s > bestScore) {
-        bestScore = s;
-        bestExpr = expr;
-      }
+    const li = parseInt(left, 10);
+    const ri = parseInt(right, 10);
+    // Scores like "100" must not become 10*0; zero is never a times-table operand
+    if (li === 0 || ri === 0) continue;
+    // Glued OCR is only for missing × (not scores reinvented as +/−)
+    if (li < 1 || li > 12 || ri < 1 || ri > 12) continue;
+    // "101" → 10*1 is score noise; keep 1*12 from "112"
+    if (ri === 1) continue;
+
+    const op = "*";
+    const expr = `${left}${op}${right}`;
+    if (!canEval(expr)) continue;
+    const s = scoreSplit(left, right, op);
+    if (s > bestScore) {
+      bestScore = s;
+      bestExpr = expr;
     }
   }
 
-  return bestExpr ?? text;
+  // Require a confident split so random digit runs don't become fake questions
+  return bestScore >= 18 ? bestExpr : text;
 }
 
 function normalize(raw) {
   let text = String(raw || "").trim();
-  for (const [bad, good] of Object.entries(OCR_MAP)) {
+  if (!text) return "";
+
+  for (const [bad, good] of Object.entries(SYMBOL_MAP)) {
     text = text.split(bad).join(good);
   }
 
-  text = text.replace(/(\d)\s*x\s*(\d)/gi, "$1*$2");
+  if (looksMostlyNumeric(text)) {
+    for (const [bad, good] of Object.entries(OCR_LETTER_MAP)) {
+      text = text.split(bad).join(good);
+    }
+  }
+
+  text = text.replace(/(\d)\s*[xX]\s*(\d)/g, "$1*$2");
+  text = text.replace(/=\s*\?.*$/g, "");
+  text = text.replace(/=.*$/, ""); // "12*7=?" leftovers → "12*7"
 
   if (!hasOperator(text)) {
     text = text.replace(/(\d+)\s+(\d+)/g, "$1*$2");
   }
 
-  text = text.replace(/(\d)\s*x\s*(\d)/gi, "$1*$2");
-  text = text.replace(/=.*$/, ""); // "12×7=?" → "12×7"
+  text = text.replace(/(\d)\s*[xX]\s*(\d)/g, "$1*$2");
   text = text.replace(/[^0-9+\-*/().=]/g, "");
   text = text.replace(/\s*([+\-*/=()])\s*/g, "$1");
+
+  // 1–2 digit bare integers are UI noise (score/id). 3+ may be glued OCR like "912".
+  if (/^\d{1,2}$/.test(text)) {
+    return "";
+  }
 
   if (!hasOperator(text)) {
     text = repairGluedDigits(text);
   }
 
-  // Lone small integer with no operator is usually UI noise (task id, score), not a question
-  if (/^\d{1,3}$/.test(text) && !hasOperator(text)) {
+  // Still a bare integer after repair → reject (unsplit noise)
+  if (/^\d+$/.test(text) && !hasOperator(text)) {
     return "";
   }
 
@@ -151,7 +193,11 @@ function solve(raw) {
   }
 }
 
-// Export for content script (same world)
+// Export for content script (same world) and Node tests
+const SparxSolver = { normalize, solve, formatResult, repairGluedDigits };
 if (typeof globalThis !== "undefined") {
-  globalThis.SparxSolver = { normalize, solve };
+  globalThis.SparxSolver = SparxSolver;
+}
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = SparxSolver;
 }

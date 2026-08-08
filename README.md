@@ -1,6 +1,6 @@
 # Sparx Times Table Solver (Chrome Extension)
 
-A Chrome extension that reads maths questions **directly from the Sparx Maths page**, solves them, and fills in the answer.
+A Chrome extension that reads maths questions **directly from the Sparx Maths page**, solves them, and fills in the answer — including **Hundred Club** (on-screen keypad).
 
 ---
 
@@ -9,10 +9,13 @@ A Chrome extension that reads maths questions **directly from the Sparx Maths pa
 ```
 sparx-times-table-solver/
 ├── README.md          ← you are here
+├── package.json       ← optional: npm test for the maths solver
+├── tests/
 └── extension/         ← load THIS folder in Chrome
     ├── manifest.json
     ├── content.js
     ├── solver.js
+    ├── sparx-dom.js
     ├── background.js
     ├── popup.html
     ├── popup.js
@@ -45,19 +48,21 @@ The extension lives in the **`extension/`** folder — not the repo root.
 
 6. Pin **Sparx Times Table Solver** from the puzzle icon in the toolbar.
 
+7. After installing or updating, **refresh** any open Sparx tab.
+
 ---
 
 ## How to use
 
 1. Open **Sparx Maths** (100 Club or similar) in Chrome and **refresh the page** after installing the extension.
 
-2. A **Sparx Solver** tab at the **bottom-left** opens the controls (hidden by default so it does not cover the question). Hundred Club shows **`12 × 7 = ?`** at the top — the extension reads that box and types the answer with your keyboard (Enter to submit).
+2. A **Sparx Solver** tab at the **bottom-left** opens the controls (hidden by default so it does not cover the question). Hundred Club shows **`12 × 7 = ?`** at the top — the extension reads that box and enters the answer via the **on-screen keypad** (or a real input when present).
 
-3. Open a question with the **answer box** visible.
+3. Open a question with the answer area visible.
 
 4. Click **Scan question** on the panel → check **Detected** / **Answer**.
 
-5. Click in the Sparx **answer field**, then **Start** on the panel.
+5. Click **Start** on the panel (no need to focus an input for Hundred Club).
 
 6. **Stop** ends the session.
 
@@ -73,15 +78,34 @@ If Chrome says the manifest is missing, you picked the repo root. Choose **`exte
 
 ### “Open Sparx Maths in this tab first”
 
-- Use a Sparx tab (`sparxmaths.com`, etc.) and refresh after installing.
+- Use a Sparx tab (`sparxmaths.com`, `sparx-learning.com`, etc.) and refresh after installing.
 
 ### Detected is “—”
 
-- Question must be on screen → try **Scan page now** again.
+- Question must be on screen → try **Scan question** again.
+- Hide the panel with **×** if it covers the numbers.
 
-### Nothing types
+### Nothing types / answers not accepted
 
-- Click the answer box before **Start**.
+- Hundred Club needs the **on-screen number pad** visible (digits + OK).
+- Refresh the Sparx tab after updating the extension.
+- If the question lives in an iframe, Start from the panel still works — the background script talks to every frame.
+
+### After updating the extension
+
+1. Go to `chrome://extensions`
+2. Click the refresh icon on Sparx Solver
+3. Hard-refresh the Sparx tab
+
+---
+
+## Developer
+
+```bash
+npm test
+```
+
+Runs unit tests for the maths normaliser/solver (no Chrome required).
 
 ---
 
@@ -90,10 +114,11 @@ If Chrome says the manifest is missing, you picked the repo root. Choose **`exte
 | File | Purpose |
 |------|---------|
 | `manifest.json` | Extension config |
-| `content.js` | Reads question, fills answer on Sparx pages |
+| `content.js` | Reads question, enters answer, on-page panel |
+| `sparx-dom.js` | Sparx / Hundred Club DOM + keypad helpers |
 | `solver.js` | Maths normalisation + solver |
 | `popup.html` / `popup.js` | Toolbar UI |
-| `background.js` | Status messages |
+| `background.js` | Multi-frame messaging + script injection |
 
 ---
 

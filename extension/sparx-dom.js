@@ -4,6 +4,7 @@
 const SparxDom = (() => {
   const OP_CHAR = /^[×x*÷/+\-−]$/;
   const DIGIT_ONLY = /^\d{1,3}$/;
+  const SINGLE_DIGIT = /^\d$/;
   const NOISE =
     /hundred|club|sparx|task|round|score|timer|level|package|submit|enter|next|previous|cookie|menu|settings|package|student|games/i;
 
@@ -33,6 +34,7 @@ const SparxDom = (() => {
   }
 
   function* walkRoots(root) {
+    if (!root) return;
     yield root;
     for (const el of root.querySelectorAll?.("*") || []) {
       yield el;
@@ -49,6 +51,7 @@ const SparxDom = (() => {
       .replace(/×/g, "*")
       .replace(/÷/g, "/")
       .replace(/(\d)\s*x\s*(\d)/gi, "$1*$2")
+      .replace(/\s*([*/+\-])\s*/g, "$1")
       .trim();
   }
 
@@ -315,20 +318,20 @@ const SparxDom = (() => {
   function findQuestionText() {
     const input = findAnswerFocusTarget();
     const candidates = [
-      findFromQuestionBanner(),
-      findFromLargeText(),
-      findFromOperandTokens(input),
-      findNearInput(input),
-      findFromBodyScan(),
-    ].filter(Boolean);
+      { text: findFromQuestionBanner(), source: "banner" },
+      { text: findFromLargeText(), source: "large" },
+      { text: findFromOperandTokens(input), source: "tokens" },
+      { text: findNearInput(input), source: "near-input" },
+      { text: findFromBodyScan(), source: "body" },
+    ].filter((c) => c.text);
 
     let best = "";
     let bestScore = -1;
     for (const c of candidates) {
-      const s = scoreCandidate(c, "merge");
+      const s = scoreCandidate(c.text, c.source);
       if (s > bestScore) {
         bestScore = s;
-        best = c;
+        best = c.text;
       }
     }
     return best;
@@ -347,11 +350,104 @@ const SparxDom = (() => {
     return parts[0] || "";
   }
 
+  function isClickable(el) {
+    if (!el || isOurUi(el)) return false;
+    const tag = el.tagName;
+    if (tag === "BUTTON" || tag === "A") return true;
+    if (el.getAttribute?.("role") === "button") return true;
+    if (typeof el.onclick === "function") return true;
+    const s = window.getComputedStyle(el);
+    if (s.cursor === "pointer") return true;
+    // Many Sparx keypad keys are styled divs
+    if (tag === "DIV" || tag === "SPAN") {
+      const r = el.getBoundingClientRect();
+      if (r.width >= 28 && r.width <= 120 && r.height >= 28 && r.height <= 120) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Find on-screen keypad key (digit or "ok"/"enter"/"✓").
+   * Prefers bottom-of-screen controls so we don't hit the 1–12 practice grid.
+   */
+  function findKeypadKey(label) {
+    const want = String(label).trim().toLowerCase();
+    const aliases =
+      want === "ok" || want === "enter"
+        ? ["ok", "enter", "✓", "✔", "➜", "→", "go"]
+        : [want];
+
+    const matches = [];
+    for (const el of walkRoots(document.body)) {
+      if (!isVisible(el) || !isClickable(el)) continue;
+      const t = (getDirectText(el) || (el.innerText || "").trim()).toLowerCase();
+      if (!aliases.includes(t)) continue;
+
+      // Skip large multi-line containers
+      if ((el.innerText || "").trim().includes("\n")) continue;
+
+      const r = el.getBoundingClientRect();
+      let score = 0;
+      // Prefer bottom half (keypad lives under the question)
+      if (r.top > window.innerHeight * 0.45) score += 40;
+      if (r.top > window.innerHeight * 0.55) score += 20;
+      // Digit keys are roughly square / compact
+      if (SINGLE_DIGIT.test(want) && Math.abs(r.width - r.height) < 30) score += 15;
+      if (el.tagName === "BUTTON") score += 10;
+      score += Math.min(r.width, 80) / 10;
+      matches.push({ el, score });
+    }
+
+    matches.sort((a, b) => b.score - a.score);
+    return matches[0]?.el || null;
+  }
+
+  function clickEl(el) {
+    if (!el) return false;
+    const mouse = { bubbles: true, cancelable: true, view: window, button: 0 };
+    // Press sequence helps frameworks that listen to pointer/mouse down;
+    // finish with a single .click() so the click handler only runs once.
+    try {
+      if (typeof PointerEvent === "function") {
+        el.dispatchEvent(new PointerEvent("pointerdown", mouse));
+      }
+    } catch {
+      /* jsdom / older engines */
+    }
+    el.dispatchEvent(new MouseEvent("mousedown", mouse));
+    try {
+      if (typeof PointerEvent === "function") {
+        el.dispatchEvent(new PointerEvent("pointerup", mouse));
+      }
+    } catch {
+      /* ignore */
+    }
+    el.dispatchEvent(new MouseEvent("mouseup", mouse));
+    if (typeof el.click === "function") el.click();
+    else el.dispatchEvent(new MouseEvent("click", mouse));
+    return true;
+  }
+
+  /** True when page looks like Hundred Club (keypad / "..." answer, no real input). */
+  function looksLikeHundredClub() {
+    if (findAnswerInput()) return false;
+    if (findKeypadKey("ok") || findKeypadKey("1")) return true;
+    for (const el of walkRoots(document.body)) {
+      if (!isVisible(el)) continue;
+      const t = (el.innerText || "").trim();
+      if (t === "..." || /^\.{2,}$/.test(t)) return true;
+    }
+    return false;
+  }
+
   return {
     findQuestionText,
     findQuestionTextDebug,
     findAnswerInput,
     findAnswerFocusTarget,
+    findKeypadKey,
+    clickEl,
+    looksLikeHundredClub,
     isSolvable,
     cleanLine,
     isVisible,

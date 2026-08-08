@@ -2,21 +2,30 @@
 
 A Chrome extension that reads maths questions **directly from the Sparx Maths page**, solves them, and fills in the answer — including **Hundred Club** (on-screen keypad).
 
+**Current extension version:** `2.2.0` (see `extension/manifest.json`).
+
 ---
 
 ## Folder layout
 
 ```
 sparx-times-table-solver/
-├── README.md          ← you are here
-├── package.json       ← optional: npm test for the maths solver
+├── README.md
+├── AGENTS.md          ← rules for AI coding agents (git authorship, etc.)
+├── package.json       ← npm test (solver + DOM helpers)
+├── package-lock.json
 ├── tests/
+│   ├── solver.test.js
+│   ├── sparx-dom.test.js
+│   └── fixtures/
+│       └── hundred-club-mock.html
 └── extension/         ← load THIS folder in Chrome
     ├── manifest.json
     ├── content.js
     ├── solver.js
     ├── sparx-dom.js
     ├── background.js
+    ├── panel.css
     ├── popup.html
     ├── popup.js
     └── popup.css
@@ -102,10 +111,14 @@ If Chrome says the manifest is missing, you picked the repo root. Choose **`exte
 ## Developer
 
 ```bash
+npm install
 npm test
 ```
 
-Runs unit tests for the maths normaliser/solver (no Chrome required).
+Runs:
+
+- **Solver tests** — maths normalisation / answers (no Chrome)
+- **DOM tests** — Hundred Club mock page via jsdom (question detect, keypad clicks, advance)
 
 ---
 
@@ -113,12 +126,13 @@ Runs unit tests for the maths normaliser/solver (no Chrome required).
 
 | File | Purpose |
 |------|---------|
-| `manifest.json` | Extension config |
+| `manifest.json` | Extension config (v2.2.0) |
 | `content.js` | Reads question, enters answer, on-page panel |
 | `sparx-dom.js` | Sparx / Hundred Club DOM + keypad helpers |
 | `solver.js` | Maths normalisation + solver |
-| `popup.html` / `popup.js` | Toolbar UI |
-| `background.js` | Multi-frame messaging + script injection |
+| `panel.css` | Floating on-page panel styles |
+| `popup.html` / `popup.js` / `popup.css` | Toolbar UI |
+| `background.js` | Multi-frame messaging + script / CSS injection |
 
 ---
 

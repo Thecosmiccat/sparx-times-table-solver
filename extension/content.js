@@ -4,12 +4,12 @@
 (() => {
   // Prevent duplicate listeners/panels when background re-injects after install
   if (globalThis.__SPARX_SOLVER_LOADED__) return;
-  globalThis.__SPARX_SOLVER_LOADED__ = true;
 
   if (typeof SparxDom === "undefined" || typeof SparxSolver === "undefined") {
     console.error("[Sparx Solver] Missing SparxDom/SparxSolver — reload the extension and refresh.");
     return;
   }
+  globalThis.__SPARX_SOLVER_LOADED__ = true;
 
   const findAnswerTarget = () => SparxDom.findAnswerFocusTarget();
   const findQuestionText = () => SparxDom.findQuestionText();
@@ -81,14 +81,13 @@
 
   async function typeViaKeypad(value) {
     const str = String(value);
-    let typed = 0;
     for (const ch of str) {
       const key = SparxDom.findKeypadKey(ch);
-      if (!key || !SparxDom.clickEl(key)) return typed > 0;
-      typed += 1;
+      // Partial entry is failure — caller may fall back to keyboard
+      if (!key || !SparxDom.clickEl(key)) return false;
       await sleep(70);
     }
-    return typed === str.length;
+    return str.length > 0;
   }
 
   async function typeViaKeyboard(value) {
@@ -227,6 +226,7 @@
         message: `${normalized} = ${answer}`,
       });
 
+      // Same question still on screen after a recent attempt — wait, don't re-type yet
       if (normalized === lastQuestion) {
         dupes += 1;
         if (dupes > 40) {
@@ -238,27 +238,38 @@
       }
       dupes = 0;
 
-      lastQuestion = normalized;
       const method = await typeAnswer(answer);
       await sleep(120);
       await submitAnswer();
 
       const advanced = await waitForQuestionChange(normalized, Math.max(roundDelay, 900));
-      completed += 1;
-      sendStatus({
-        running: true,
-        completed,
-        total: rounds,
-        raw,
-        normalized,
-        answer,
-        message: advanced
-          ? `Submitted ${answer} via ${method} (${completed}/${rounds})`
-          : `Submitted ${answer} via ${method} — waiting for next… (${completed}/${rounds})`,
-      });
-
-      if (!advanced) await sleep(roundDelay);
-      else await sleep(Math.min(roundDelay, 400));
+      if (advanced) {
+        completed += 1;
+        lastQuestion = normalized;
+        sendStatus({
+          running: true,
+          completed,
+          total: rounds,
+          raw,
+          normalized,
+          answer,
+          message: `Submitted ${answer} via ${method} (${completed}/${rounds})`,
+        });
+        await sleep(Math.min(roundDelay, 400));
+      } else {
+        // Do not count progress or lock the question — allow a clean retry
+        lastQuestion = "";
+        sendStatus({
+          running: true,
+          completed,
+          total: rounds,
+          raw,
+          normalized,
+          answer,
+          message: `Submitted ${answer} via ${method} — not advanced, retrying… (${completed}/${rounds})`,
+        });
+        await sleep(roundDelay);
+      }
     }
 
     running = false;

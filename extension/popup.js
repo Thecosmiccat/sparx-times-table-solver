@@ -18,7 +18,7 @@ function setRunning(running) {
 function updateUI(data) {
   if (!data) return;
   detectedEl.textContent = data.normalized || data.raw || "—";
-  answerEl.textContent = data.answer || "—";
+  answerEl.textContent = data.answer ?? "—";
   progressEl.textContent = `${data.completed ?? 0} / ${data.total ?? 0}`;
   statusEl.textContent = data.message || "—";
   setRunning(!!data.running);

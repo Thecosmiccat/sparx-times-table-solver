@@ -44,6 +44,10 @@ console.log("\nglued digit repair (OCR-ish)");
 assertEqual(solveAnswer("67"), null, "2-digit alone is noise, not 6*7");
 assertEqual(solveAnswer("912"), "108", "9*12 preferred over noise");
 assertEqual(solveAnswer("6 7"), "42", "spaced operands become multiply");
+assertEqual(solveAnswer("100"), null, "score 100 is not 10*0");
+assertEqual(solveAnswer("101"), null, "score 101 is not 10*1");
+assertEqual(solveAnswer("112"), "12", "1*12 glued OCR still works");
+assertEqual(solveAnswer("0 x 5"), "0", "explicit 0×5 still solves");
 
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

@@ -3,6 +3,7 @@
 ._*
 .idea/
 .vscode/
+.cursor/
 *.swp
 .env
 .env.*

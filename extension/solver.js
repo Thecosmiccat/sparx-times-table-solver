@@ -88,15 +88,22 @@ function repairGluedDigits(text) {
       continue;
     }
 
-    for (const op of ["*", "+", "-"]) {
-      if (op === "-" && parseInt(left, 10) < parseInt(right, 10)) continue;
-      const expr = `${left}${op}${right}`;
-      if (!canEval(expr)) continue;
-      const s = scoreSplit(left, right, op);
-      if (s > bestScore) {
-        bestScore = s;
-        bestExpr = expr;
-      }
+    const li = parseInt(left, 10);
+    const ri = parseInt(right, 10);
+    // Scores like "100" must not become 10*0; zero is never a times-table operand
+    if (li === 0 || ri === 0) continue;
+    // Glued OCR is only for missing × (not scores reinvented as +/−)
+    if (li < 1 || li > 12 || ri < 1 || ri > 12) continue;
+    // "101" → 10*1 is score noise; keep 1*12 from "112"
+    if (ri === 1) continue;
+
+    const op = "*";
+    const expr = `${left}${op}${right}`;
+    if (!canEval(expr)) continue;
+    const s = scoreSplit(left, right, op);
+    if (s > bestScore) {
+      bestScore = s;
+      bestExpr = expr;
     }
   }
 

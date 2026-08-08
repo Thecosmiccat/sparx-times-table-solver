@@ -9,6 +9,8 @@ const latestStatus = {
   answer: "",
 };
 
+const CONTENT_SCRIPTS = ["solver.js", "sparx-dom.js", "content.js"];
+
 function isSparxUrl(url) {
   if (!url) return false;
   return /sparxmaths|sparx-learning|maths\.sparx/i.test(url);
@@ -22,31 +24,77 @@ async function activeTab() {
 async function injectScripts(tabId) {
   await chrome.scripting.executeScript({
     target: { tabId, allFrames: true },
-    files: ["solver.js", "content.js"],
+    files: CONTENT_SCRIPTS,
   });
-}
-
-async function sendToTab(tabId, message) {
+  // Panel styles only matter in the top frame
   try {
-    return await chrome.tabs.sendMessage(tabId, message);
+    await chrome.scripting.insertCSS({
+      target: { tabId, allFrames: false },
+      files: ["panel.css"],
+    });
   } catch {
-    await injectScripts(tabId);
-    return await chrome.tabs.sendMessage(tabId, message);
+    /* ignore CSS inject failures */
   }
 }
 
-async function broadcastToTab(tabId, message) {
+/** Discover frame ids without webNavigation permission. */
+async function listFrameIds(tabId) {
   try {
-    return await sendToTab(tabId, message);
-  } catch (firstErr) {
-    // If no frame handled it, try injection once more
-    try {
-      await injectScripts(tabId);
-      return await chrome.tabs.sendMessage(tabId, message);
-    } catch {
-      throw firstErr;
-    }
+    const results = await chrome.scripting.executeScript({
+      target: { tabId, allFrames: true },
+      func: () => true,
+    });
+    return results.map((r) => r.frameId).filter((id) => typeof id === "number");
+  } catch {
+    return [0];
   }
+}
+
+async function sendToFrame(tabId, frameId, message) {
+  return chrome.tabs.sendMessage(tabId, message, { frameId });
+}
+
+/**
+ * Send to every frame; prefer a frame that returns ok:true (handles the question).
+ * Needed because Hundred Club often runs inside an iframe.
+ */
+async function broadcastToTab(tabId, message) {
+  let frameIds = await listFrameIds(tabId);
+  if (!frameIds.length) frameIds = [0];
+
+  let lastError = null;
+  let anyResponse = null;
+
+  const tryAll = async () => {
+    for (const frameId of frameIds) {
+      try {
+        const res = await sendToFrame(tabId, frameId, message);
+        if (res != null) anyResponse = res;
+        if (res?.ok) return res;
+      } catch (e) {
+        lastError = e;
+      }
+    }
+    return null;
+  };
+
+  let res = await tryAll();
+  if (res?.ok) return res;
+
+  // Page may have been open before install — inject and retry once
+  try {
+    await injectScripts(tabId);
+    frameIds = await listFrameIds(tabId);
+    if (!frameIds.length) frameIds = [0];
+    res = await tryAll();
+    if (res?.ok) return res;
+    if (anyResponse) return anyResponse;
+  } catch (e) {
+    lastError = e;
+  }
+
+  if (anyResponse) return anyResponse;
+  throw lastError || new Error("No Sparx content script responded — refresh the page.");
 }
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {

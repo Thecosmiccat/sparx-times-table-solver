@@ -92,7 +92,7 @@ roundsEl.addEventListener("change", () => chrome.storage.local.set({ rounds: rou
 delayEl.addEventListener("change", () => chrome.storage.local.set({ delay: delayEl.value }));
 
 (async () => {
-  statusEl.textContent = "Tip: use the Sparx Solver panel on the page (bottom-right).";
+  statusEl.textContent = "Tip: use the Sparx Solver panel on the page (bottom-left).";
   try {
     const res = await sendCommand("ping", {});
     setRunning(!!res.running);

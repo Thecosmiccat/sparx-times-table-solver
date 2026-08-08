@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Hundred Club Mock</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: Georgia, serif;
+        background: #0b3d2e;
+        color: #fff;
+        min-height: 100vh;
+      }
+      .banner {
+        text-align: center;
+        padding: 32px 16px 12px;
+        font-size: 42px;
+        font-weight: 700;
+      }
+      .answer {
+        text-align: center;
+        font-size: 36px;
+        letter-spacing: 4px;
+        margin: 12px 0 28px;
+        color: #c8f7d4;
+      }
+      .keypad {
+        display: grid;
+        grid-template-columns: repeat(3, 72px);
+        gap: 10px;
+        justify-content: center;
+        margin-bottom: 24px;
+      }
+      .keypad button {
+        width: 72px;
+        height: 72px;
+        font-size: 28px;
+        border: none;
+        border-radius: 10px;
+        background: #145c45;
+        color: #fff;
+        cursor: pointer;
+      }
+      .keypad button.ok {
+        background: #2d8a4e;
+        grid-column: span 1;
+      }
+      .log {
+        max-width: 420px;
+        margin: 0 auto;
+        background: #06261c;
+        padding: 12px;
+        border-radius: 8px;
+        font-family: ui-monospace, monospace;
+        font-size: 13px;
+        min-height: 80px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="banner" id="question">12 × 7 = ?</div>
+    <div class="answer" id="answer">...</div>
+    <div class="keypad" id="keypad"></div>
+    <pre class="log" id="log">Ready</pre>
+    <script>
+      const questions = ["12 × 7 = ?", "9 × 9 = ?", "11 × 12 = ?", "8 × 6 = ?", "3 × 4 = ?"];
+      let qi = 0;
+      let buffer = "";
+      const answerEl = document.getElementById("answer");
+      const questionEl = document.getElementById("question");
+      const logEl = document.getElementById("log");
+      const keypad = document.getElementById("keypad");
+
+      function expected() {
+        const m = questionEl.textContent.match(/(\d+)\s*[×x*]\s*(\d+)/i);
+        return m ? String(parseInt(m[1], 10) * parseInt(m[2], 10)) : "";
+      }
+
+      function setQuestion(i) {
+        qi = i % questions.length;
+        questionEl.textContent = questions[qi];
+        buffer = "";
+        answerEl.textContent = "...";
+      }
+
+      function submit() {
+        const want = expected();
+        if (buffer === want) {
+          logEl.textContent = `OK ${buffer} for ${questionEl.textContent}`;
+          setQuestion(qi + 1);
+        } else {
+          logEl.textContent = `Wrong: got ${buffer || "(empty)"}, want ${want}`;
+          buffer = "";
+          answerEl.textContent = "...";
+        }
+      }
+
+      for (const label of ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "OK"]) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.textContent = label;
+        if (label === "OK") btn.className = "ok";
+        btn.addEventListener("click", () => {
+          if (label === "OK") {
+            submit();
+            return;
+          }
+          buffer += label;
+          answerEl.textContent = buffer;
+        });
+        keypad.appendChild(btn);
+      }
+
+      window.__mock = { setQuestion, expected, getBuffer: () => buffer, getQuestion: () => questionEl.textContent };
+    </script>
+  </body>
+</html>

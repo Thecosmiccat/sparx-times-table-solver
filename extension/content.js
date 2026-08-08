@@ -2,6 +2,15 @@
  * Sparx page automation + floating control panel (stays on page when popup closes).
  */
 (() => {
+  // Prevent duplicate listeners/panels when background re-injects after install
+  if (globalThis.__SPARX_SOLVER_LOADED__) return;
+  globalThis.__SPARX_SOLVER_LOADED__ = true;
+
+  if (typeof SparxDom === "undefined" || typeof SparxSolver === "undefined") {
+    console.error("[Sparx Solver] Missing SparxDom/SparxSolver — reload the extension and refresh.");
+    return;
+  }
+
   const findAnswerTarget = () => SparxDom.findAnswerFocusTarget();
   const findQuestionText = () => SparxDom.findQuestionText();
 
@@ -23,10 +32,10 @@
   }
 
   function canHandlePage() {
-    return !!(findQuestionText() || findAnswerTarget());
+    return !!(findQuestionText() || SparxDom.findAnswerInput() || SparxDom.looksLikeHundredClub());
   }
 
-  /** Hundred Club listens for physical keyboard — no <input> field. */
+  /** Synthetic keys — unreliable for canvas/game UIs, kept as last resort. */
   function dispatchKey(key, code, type) {
     const opts = {
       key,
@@ -35,41 +44,125 @@
       which: key.length === 1 ? key.charCodeAt(0) : 13,
       bubbles: true,
       cancelable: true,
+      composed: true,
     };
-    for (const target of [document, document.body, window]) {
-      target.dispatchEvent(new KeyboardEvent(type, opts));
+    const targets = [document.activeElement, document.body, document, window].filter(Boolean);
+    for (const target of targets) {
+      try {
+        target.dispatchEvent(new KeyboardEvent(type, opts));
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
+  function setNativeValue(el, value) {
+    const str = String(value);
+    if (el.isContentEditable || el.getAttribute?.("contenteditable") === "true") {
+      el.focus();
+      el.textContent = str;
+      el.dispatchEvent(new InputEvent("input", { bubbles: true, data: str, inputType: "insertText" }));
+      return true;
+    }
+
+    const tag = el.tagName;
+    const proto =
+      tag === "TEXTAREA"
+        ? HTMLTextAreaElement.prototype
+        : HTMLInputElement.prototype;
+    const desc = Object.getOwnPropertyDescriptor(proto, "value");
+    el.focus();
+    if (desc?.set) desc.set.call(el, str);
+    else el.value = str;
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+    return true;
+  }
+
+  async function typeViaKeypad(value) {
+    const str = String(value);
+    let typed = 0;
+    for (const ch of str) {
+      const key = SparxDom.findKeypadKey(ch);
+      if (!key || !SparxDom.clickEl(key)) return typed > 0;
+      typed += 1;
+      await sleep(70);
+    }
+    return typed === str.length;
+  }
+
+  async function typeViaKeyboard(value) {
+    const target = findAnswerTarget();
+    target?.focus?.();
+    window.focus();
+    await sleep(60);
+
+    const str = String(value);
+    for (const ch of str) {
+      const code = ch >= "0" && ch <= "9" ? `Digit${ch}` : `Key${ch.toUpperCase()}`;
+      dispatchKey(ch, code, "keydown");
+      dispatchKey(ch, code, "keypress");
+      if (document.activeElement && "value" in document.activeElement) {
+        // Some React inputs only update on InputEvent
+        document.activeElement.dispatchEvent(
+          new InputEvent("input", { bubbles: true, data: ch, inputType: "insertText" })
+        );
+      }
+      dispatchKey(ch, code, "keyup");
+      await sleep(45);
     }
   }
 
   async function typeAnswer(value) {
-    const target = findAnswerTarget();
-    target?.focus?.();
-    window.focus();
-    await sleep(80);
-
-    const str = String(value);
-    for (const ch of str) {
-      const code = ch >= "0" && ch <= "9" ? `Digit${ch}` : `Key${ch}`;
-      dispatchKey(ch, code, "keydown");
-      dispatchKey(ch, code, "keypress");
-      dispatchKey(ch, code, "keyup");
-      await sleep(50);
+    const input = SparxDom.findAnswerInput();
+    if (input) {
+      setNativeValue(input, value);
+      await sleep(80);
+      return "input";
     }
+
+    // Hundred Club: click the on-screen number pad (synthetic keys are ignored)
+    if (await typeViaKeypad(value)) {
+      return "keypad";
+    }
+
+    await typeViaKeyboard(value);
+    return "keyboard";
   }
 
-  function submitAnswer() {
-    dispatchKey("Enter", "Enter", "keydown");
-    dispatchKey("Enter", "Enter", "keyup");
-
-    // Green OK button on the on-screen keypad
-    for (const el of document.querySelectorAll("button, [role='button'], div, span")) {
-      if (!SparxDom.isVisible(el) || SparxDom.isOurUi(el)) continue;
-      const label = (el.innerText || el.textContent || "").trim().toLowerCase();
-      if (label === "ok") {
-        el.click();
-        return;
+  async function submitAnswer() {
+    // Prefer keypad OK / Enter
+    for (const label of ["ok", "enter"]) {
+      const btn = SparxDom.findKeypadKey(label);
+      if (btn && SparxDom.clickEl(btn)) {
+        await sleep(40);
+        return "keypad";
       }
     }
+
+    dispatchKey("Enter", "Enter", "keydown");
+    dispatchKey("Enter", "Enter", "keypress");
+    dispatchKey("Enter", "Enter", "keyup");
+
+    const input = SparxDom.findAnswerInput();
+    if (input?.form) {
+      input.form.requestSubmit?.();
+    }
+    return "enter";
+  }
+
+  async function waitForQuestionChange(prevNormalized, timeoutMs) {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      if (stopRequested) return false;
+      const raw = findQuestionText();
+      if (raw) {
+        const { normalized } = SparxSolver.solve(raw);
+        if (normalized && normalized !== prevNormalized) return true;
+      }
+      await sleep(120);
+    }
+    return false;
   }
 
   async function runSession({ rounds, roundDelay, repeatDelay }) {
@@ -146,10 +239,11 @@
       dupes = 0;
 
       lastQuestion = normalized;
-      await typeAnswer(answer);
-      await sleep(150);
-      submitAnswer();
+      const method = await typeAnswer(answer);
+      await sleep(120);
+      await submitAnswer();
 
+      const advanced = await waitForQuestionChange(normalized, Math.max(roundDelay, 900));
       completed += 1;
       sendStatus({
         running: true,
@@ -158,10 +252,13 @@
         raw,
         normalized,
         answer,
-        message: `Submitted ${answer} (${completed}/${rounds})`,
+        message: advanced
+          ? `Submitted ${answer} via ${method} (${completed}/${rounds})`
+          : `Submitted ${answer} via ${method} — waiting for next… (${completed}/${rounds})`,
       });
 
-      await sleep(roundDelay);
+      if (!advanced) await sleep(roundDelay);
+      else await sleep(Math.min(roundDelay, 400));
     }
 
     running = false;
